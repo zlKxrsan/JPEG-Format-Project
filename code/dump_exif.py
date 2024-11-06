@@ -2,10 +2,10 @@ from pathlib import Path
 import re
 from hexdump import dump, dehex
 
-path = Path("jpeg_format/code/dump_exif.py")
+path = Path("JPEG-Format-Project/code/dump_exif.py")
 
 file_name = path.parents[2].absolute() / "jpeg_with_exif/canon.jpg"
-file_to_restore_dump_into = path[2] / "restored_results/canon_restored.jpg"
+file_to_restore_dump_into = path.parents[2].absolute() / "restored_results/canon_restored.jpg"
 
 with open(file_name, 'rb') as file:
     file_content = file.read()
