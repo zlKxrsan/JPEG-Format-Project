@@ -3,6 +3,11 @@ import exifread
 from hexdump import dump, dehex
 from file_path import FILE_PATH, RESTORE_FILE_PATH
 
+
+#TODO
+#change remove Thumbnail to proper function
+# change change_date to handling all little and big endians
+
 """ This module contains functions to manipulate and read exif-headers """
 
 def read_exif():
