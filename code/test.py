@@ -4,7 +4,7 @@ from hexdump import dump
 from enum import Flag
 
 """This Module contains all functions handling the exif-segment of or jpeg-files"""
-"""We work with 4 bits instead of 8 due to the handling of the dataflow in hex with hexdump, so every calculation takes twice the coefficient"""
+"""We work with 4 bits instead of 8 due to the handling of the dataflow in hex with hexdump, so every offset is 2x"""
 
 class Endian(Flag):
     BIG = True
@@ -28,7 +28,7 @@ def get_tags(num_of_tags, tags_segment):
         tags[tag_id] = (tag_type, tag_size, tag_offset)
     return tags
 
-def get_tag_type_size(tag_type):
+def get_tag_type_size(tag_type): #this function cant handle exif_type over 5
     res = None
     match tag_type:
         case 1:             #Byte
@@ -45,10 +45,10 @@ def get_tag_type_size(tag_type):
                 Exception("Not an exif type!")
     return res
         
-def get_tag_value(exif_segment, tags, tag, offset): # Ausnahme ist der IDFPointer-Tag, weil im an der offset stelle nur zwei Bytes für die anzahl an tags stehen.
+def get_tag_value(exif_segment, tag): # Ausnahme ist der IDFPointer-Tag, weil im an der offset stelle nur zwei Bytes für die anzahl an tags stehen.
 
     tag_value = None
-    (tag_type, tag_size, tag_offset) = tags[tag]
+    (tag_type, tag_size, tag_offset) = tag
     temp_offset = int(tag_offset, 16)*2 + offset
     tag_value = exif_segment[temp_offset:
                         temp_offset +int(tag_size, 16)*get_tag_type_size(int(tag_type, 16))] # Achtung wegen ifdpointer!!!!!!! und little endian
@@ -56,6 +56,18 @@ def get_tag_value(exif_segment, tags, tag, offset): # Ausnahme ist der IDFPointe
     return tag_value
 
 
+def get_date(exif_segment, tags): # beispiel zur untermalung des verständnisses
+    bin_date = get_tag_value(exif_segment, tags["9003"])
+    ascii_date = [int(bin_date[i:i+2], 16) for i in range(0, len(bin_date), 2)]
+    return ''.join(chr(i) for i in ascii_date)
+
+#def set_date(file_dump, new_date, start, end, tags):
+#    new_date_converted = ''.join(str(hex(ord(c))[2:]).upper() for c in new_date) + '00'
+#    (tag_type, tag_size, tag_offset) = tags['9003']
+#    temp_offset = int(tag_offset, 16)*2 + offset
+#    return
+
+    
 
 with open(FILE_PATH, "rb") as file:
 
@@ -87,58 +99,8 @@ with open(FILE_PATH, "rb") as file:
     num_of_pointer_tags = int(to_big_endian(exif_segment[pointer_tags_offset:pointer_tags_offset+4]), 16)
     pointer_tags_segment = exif_segment[pointer_tags_offset+4:pointer_tags_offset*num_of_pointer_tags*24+4]
     pointer_tags = get_tags(num_of_pointer_tags, pointer_tags_segment)
-    print(pointer_tags)
 
-    print(get_tag_value(exif_segment, pointer_tags, "9003", offset))
+#    set_date(file_dump, "9999:99:99 99:99:99", idx1, idx2, tags)
 
-
-    #offset_pointer_tags = None
-    #pointer_tags = {}
-    #pointer_tags_values = {}
-#    if "8769" in tags:
-#        num_of_idf_pointer_tags = int(tags_values["8769"][:4], 16) if endian_type == Endian.BIG else int(to_big_endian(endian_type, tags_values["8769"][:4]), 16)
-#        pointer_tags_start = tags["8769"][2] + 4
-#        pointer_tags_end = pointer_tags_start + num_of_idf_pointer_tags * 24
-#        pointer_tags = get_tags(endian_type, num_of_idf_pointer_tags, exif_segment[pointer_tags_start:pointer_tags_end], 0)
-#        pointer_tags_values = get_tags_values(endian_type, exif_segment, pointer_tags) # error
-#        print(pointer_tags_values)
-        
-# Machen wir ein Tag lister damit
-#    for i in range(num_of_tags):
-#        tag = tag_segment[24*i:(1+i)*24]
-#        tag_id = to_big_endian(endian_type, tag[:4])
-#        tag_type = to_big_endian(endian_type, tag[4:8])
-#        tag_size = to_big_endian(endian_type, tag[8:16])
-#        tag_val_or_offset = to_big_endian(endian_type, tag[16:])
-#        tags[tag_id] = [tag_type, tag_size, tag_val_or_offset]
-#
-#    print(tags)
-#
-
-#fehler mit großen datentypen beim offset berechnen
-
-#def get_tags(endian_type, num_of_tags, tags_segment, offset):
-#
-#    tags = {}
-#    for i in range(num_of_tags):
-#        tag = tags_segment[24*i:(1+i)*24]
-#        tag_id = to_big_endian(endian_type, tag[:4])
-#        tag_type = None
-#        match int(to_big_endian(endian_type, tag[4:8]), 16):
-#            case 1:             #Byte
-#                tag_type = 2
-#            case 2:             #ASCII
-#                tag_type = 2
-#            case 3:             #Short
-#                tag_type = 4
-#            case 4:             #Int
-#                tag_type = 8    
-#            case 5:             #Double
-#                tag_type = 16
-#            case _:
-#                Exception("Not an exif type!")
-#        tag_size = int(to_big_endian(endian_type, tag[8:16]), 16) # Funktioniert nicht für Tag-Content, welcher ohne offset gespeichert ist.
-#        tag_offset = int(to_big_endian(endian_type, tag[16:]), 16)*2 + offset # offset vom tag-Content + offset vom exif-header.
-#        tags[tag_id] = [tag_type, tag_size, tag_offset]
-#    return tags
-#
+    #print(get_tag_value(exif_segment, pointer_tags["9003"]))
+    #print(get_date(exif_segment, pointer_tags))
