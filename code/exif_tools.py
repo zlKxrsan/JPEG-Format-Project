@@ -6,6 +6,8 @@ from enum import Flag
 """This Module contains all functions handling the exif-segment of or jpeg-files"""
 """We work with 4 bits instead of 8 due to the handling of the dataflow in hex with hexdump, so every offset is 2x"""
 
+#schau auf ptr case nur wenn vorhanden
+
 def get_seg(str, start, size):
     end = start + size
     return str[start:end]
@@ -14,20 +16,9 @@ class Endian(Flag):
     BIG = True
     SMALL = False
 
-
-def get_date(exif_segment, tags): # beispiel zur untermalung des verständnisses
-    bin_date = get_tag_value(exif_segment, tags["9003"])
-    ascii_date = [int(bin_date[i:i+2], 16) for i in range(0, len(bin_date), 2)]
-    return ''.join(chr(i) for i in ascii_date)
-
-def set_date(file_dump, new_date, start, tags):
-    new_date_converted = ''.join(str(hex(ord(c))[2:]).upper() for c in new_date) + '00'
-    (tag_type, tag_size, tag_offset) = tags['9003']
-    temp_offset = int(tag_offset, 16)*2 + offset
-    return file_dump[:start+temp_offset] + new_date_converted + file_dump[start+temp_offset+int(tag_size, 16)*get_tag_type_size(int(tag_type, 16)):]
-
 class ExifEditor():
 
+    file_dump = None
     start = 0 
     end = 0
     length = 0
@@ -37,6 +28,7 @@ class ExifEditor():
     tags_seg = ""
     tags = {}
     endian = False
+    restore_file_path = ""
 
     # Diese Variablen sind für alle IFD-Tags, welche von einem IFDPointer addressiert werden.
 
@@ -45,17 +37,18 @@ class ExifEditor():
     ptr_tags_seg = ""
     ptr_tags = {}
 
-    def __init__(self, file_name):
+    def __init__(self, file_path, restore_file_path):
 
-        with open(file_name, "rb") as file:
+        self.restore_file_path = restore_file_path
+        with open(file_path, "rb") as file:
 
             file_content = file.read()
-            file_dump = dump(file_content, size=1, sep='')
+            self.file_dump = dump(file_content, size=1, sep='')
 
-            exif_segment_span = re.search("FFE1.*?FF[^(00)]{2}", file_dump)
+            exif_segment_span = re.search("FFE1.*?FF[^(00)]{2}", self.file_dump)
             self.start = exif_segment_span.start()+4
             self.end = exif_segment_span.end()-3
-            self.exif_seg = file_dump[self.start:self.end]
+            self.exif_seg = self.file_dump[self.start:self.end]
             self.length = int(self.exif_seg[:4],16)
 
             endian_part = re.search("(4949|4D4D)", self.exif_seg)
@@ -124,4 +117,20 @@ class ExifEditor():
         
         return tag_value
 
-    #Beispiel Funktionen für die Manipulation vom Datum, mit mehr Zeit könnte man auch eine...
+    def get_date(self, tags): # beispiel zur untermalung des verständnisses
+        bin_date = self.get_tag_value(tags["9003"])
+        ascii_date = [int(bin_date[i:i+2], 16) for i in range(0, len(bin_date), 2)]
+        return ''.join(chr(i) for i in ascii_date)
+
+    def set_date_and_restore(self, new_date, tags):
+        new_date_converted = ''.join(str(hex(ord(c))[2:]).upper() for c in new_date) + '00'
+        (tag_type, tag_size, tag_offset) = tags['9003']
+        temp_offset = int(tag_offset, 16)*2 + self.offset
+        to_restore = self.file_dump[:self.start+temp_offset] + new_date_converted + self.file_dump[self.start+temp_offset+int(tag_size, 16)*self.get_tag_type_size(int(tag_type, 16)):]
+        self.restore(to_restore)
+        #Beispiel Funktionen für die Manipulation vom Datum, mit mehr Zeit könnte man auch eine...
+
+    def restore(self, to_restore):
+        with open(self.restore_file_path, "wb") as file:
+            temp_dumper = dehex(to_restore)
+            file.write(temp_dumper)
