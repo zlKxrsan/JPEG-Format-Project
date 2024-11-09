@@ -16,6 +16,44 @@ def to_big_endian(endian_type, hex_part):
     else:
         return "".join(reversed([hex_part[i:i+2] for i in range(0, len(hex_part), 2)]))
 
+def get_tags(endian_type, num_of_tags, tags_segment, offset):
+
+    tags = {}
+    for i in range(num_of_tags):
+        tag = tags_segment[24*i:(1+i)*24]
+        tag_id = to_big_endian(endian_type, tag[:4])
+        tag_type = None
+        match int(to_big_endian(endian_type, tag[4:8]), 16):
+            case 1:             #Byte
+                tag_type = 2
+            case 2:             #ASCII
+                tag_type = 2
+            case 3:             #Short
+                tag_type = 4
+            case 4:             #Int
+                tag_type = 8    
+            case 5:             #Double
+                tag_type = 16
+            case _:
+                Exception("Not an exif type!")
+        tag_size = int(to_big_endian(endian_type, tag[8:16]), 16) # doesnt work for idf without offset maybe fixing to x2???
+        tag_val_or_offset = int(to_big_endian(endian_type, tag[16:]), 16)*2 + offset # offset from lengt of exif-segment to endian decision umbenenen?
+        tags[tag_id] = [tag_type, tag_size, tag_val_or_offset]
+    return tags
+
+def get_tags_values(endian_type, exif_segment, tags):
+
+    tags_values = {}
+    for tag in tags:    #except pointer tag fix it pls
+        tag_type = tags[tag][0]
+        tag_size = tags[tag][1]
+        tag_offset = tags[tag][2]
+        tags_values[tag] = exif_segment[tag_offset:tag_offset+tag_size*tag_type] # Achtung wegen ifdpointer!!!!!!! und little endian
+    
+    return tags_values
+
+
+
 with open(FILE_PATH, "rb") as file:
 
     file_content = file.read()
@@ -38,42 +76,23 @@ with open(FILE_PATH, "rb") as file:
     num_of_tags_end = num_of_tags_start + 4
     num_of_tags = int(to_big_endian(endian_type, exif_segment[num_of_tags_start:num_of_tags_end]), 16)
 
-    tag_segment = exif_segment[num_of_tags_end:num_of_tags_end + num_of_tags * 24] # 24 steht für 12 bytes
+    tags_segment = exif_segment[num_of_tags_end:num_of_tags_end + num_of_tags * 24] # 24 steht für 12 bytes
 
-    tags = {}
+    tags = get_tags(endian_type, num_of_tags, tags_segment, offset)
 
-    for i in range(num_of_tags):
-        tag = tag_segment[24*i:(1+i)*24]
-        tag_id = to_big_endian(endian_type, tag[:4])
+    tags_values = get_tags_values(endian_type, exif_segment, tags)
 
-        tag_type = None
-        match int(to_big_endian(endian_type, tag[4:8]), 16):
-            case 1:             #Byte
-                tag_type = 2
-            case 2:             #ASCII
-                tag_type = 2
-            case 3:             #Short
-                tag_type = 4
-            case 4:             #Int
-                tag_type = 8    
-            case 5:             #Double
-                tag_type = 16
-            case _:
-                Exception("Not an exif type!")
-
-        tag_size = int(to_big_endian(endian_type, tag[8:16]), 16) # doesnt work for idf without offset maybe fixing to x2???
-        tag_val_or_offset = int(to_big_endian(endian_type, tag[16:]), 16)*2 + offset # offset from lengt of exif-segment to endian decision umbenenen?
-        tags[tag_id] = [tag_type, tag_size, tag_val_or_offset]
-
-    tags_values = {}
-    for tag in tags:    #except pointer tag fix it pls
-        tag_type = tags[tag][0]
-        tag_size = tags[tag][1]
-        tag_offset = tags[tag][2]
-        tags_values[tag] = exif_segment[tag_offset:tag_offset+tag_size*tag_type]
-    
-    print(tags_values['010F'])
-    print(tags['010F'])
+    offset_pointer_tags = None
+    pointer_tags = {}
+    pointer_tags_values = {}
+    if "8769" in tags:
+        num_of_idf_pointer_tags = int(tags_values["8769"][:4], 16) if endian_type == Endian.BIG else int(to_big_endian(endian_type, tags_values["8769"][:4]), 16)
+        pointer_tags_start = tags["8769"][2] + 4
+        pointer_tags_end = pointer_tags_start + num_of_idf_pointer_tags * 24
+        pointer_tags = get_tags(endian_type, num_of_idf_pointer_tags, exif_segment[pointer_tags_start:pointer_tags_end], 0)
+        pointer_tags_values = get_tags_values(endian_type, exif_segment, pointer_tags) # error
+        print(pointer_tags_values)
+        
 # Machen wir ein Tag lister damit
 #    for i in range(num_of_tags):
 #        tag = tag_segment[24*i:(1+i)*24]
@@ -85,3 +104,5 @@ with open(FILE_PATH, "rb") as file:
 #
 #    print(tags)
 #
+
+#fehler mit großen datentypen beim offset berechnen
