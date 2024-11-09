@@ -1,6 +1,6 @@
 import re
-from file_path import FILE_PATH
-from hexdump import dump
+from file_path import FILE_PATH, RESTORE_FILE_PATH
+from hexdump import dump, dehex
 from enum import Flag
 
 """This Module contains all functions handling the exif-segment of or jpeg-files"""
@@ -61,11 +61,11 @@ def get_date(exif_segment, tags): # beispiel zur untermalung des verständnisses
     ascii_date = [int(bin_date[i:i+2], 16) for i in range(0, len(bin_date), 2)]
     return ''.join(chr(i) for i in ascii_date)
 
-#def set_date(file_dump, new_date, start, end, tags):
-#    new_date_converted = ''.join(str(hex(ord(c))[2:]).upper() for c in new_date) + '00'
-#    (tag_type, tag_size, tag_offset) = tags['9003']
-#    temp_offset = int(tag_offset, 16)*2 + offset
-#    return
+def set_date(file_dump, new_date, start, tags):
+    new_date_converted = ''.join(str(hex(ord(c))[2:]).upper() for c in new_date) + '00'
+    (tag_type, tag_size, tag_offset) = tags['9003']
+    temp_offset = int(tag_offset, 16)*2 + offset
+    return file_dump[:start+temp_offset] + new_date_converted + file_dump[start+temp_offset+int(tag_size, 16)*get_tag_type_size(int(tag_type, 16)):]
 
     
 
@@ -100,7 +100,11 @@ with open(FILE_PATH, "rb") as file:
     pointer_tags_segment = exif_segment[pointer_tags_offset+4:pointer_tags_offset*num_of_pointer_tags*24+4]
     pointer_tags = get_tags(num_of_pointer_tags, pointer_tags_segment)
 
-#    set_date(file_dump, "9999:99:99 99:99:99", idx1, idx2, tags)
+    to_restore = set_date(file_dump, "2010:10:10 10:10:10", exif_segment_start, pointer_tags) # achtung tags welche
+
+    with open(RESTORE_FILE_PATH, "wb") as file:
+        file_dumper = dehex(to_restore)
+        file.write(file_dumper)
 
     #print(get_tag_value(exif_segment, pointer_tags["9003"]))
     #print(get_date(exif_segment, pointer_tags))
