@@ -2,16 +2,19 @@ import re
 from hexdump import dump, dehex
 from enum import Flag
 
-"""Dieses Modul beinhaltet diverse Schritte zum analysieren und bearbeiten des EXIF-segments im Dataflow eines JPEG/JPG-Files"""
-""""""
-
-#schau auf ptr case nur wenn vorhanden
+"""Dieses Modul beinhaltet diverse Schritte zum analysieren und bearbeiten des EXIF-segments
+im Dataflow eines JPEG/JPG-File. Die Implementierung berücksichtigt auch die speicheraddresse von
+IFD-Tags vie IFDPointer und manipulation von einem bereits existierenden dateOriginalTag. Eine
+Umsetzung von change_-,remove_- und add_tag wären theoretisch auch Implementierbar, aber hierfür
+müsste man den EXIF-Header aktualisieren und jeden einzelnen Tag-Offset, eine solche Umsetzung
+würde zu viel Zeit beanspruchen und wird deshalb ausgelassen, jedoch auch in unserem Papier
+Thematisiert"""
 
 def get_seg(str, start, size):
     end = start + size
     return str[start:end]
 
-class Endian(Flag):
+class Endian(Flag): # Da unsere Implementierung mit Big-Endian arbeitet muss Little-Endian convertiert werden.
     BIG = True
     SMALL = False
 
@@ -51,19 +54,28 @@ class ExifEditor():
             self.length = int(self.exif_seg[:4],16)
 
             endian_part = re.search("(4949|4D4D)", self.exif_seg)
-            self.endian = Endian.BIG if self.exif_seg[endian_part.start():endian_part.end()] == "4D4D" else Endian.SMALL
+            if self.exif_seg[endian_part.start():endian_part.end()] == "4D4D":
+                self.endian = Endian.BIG
+            else:
+                Endian.SMALL
             
-            #offest wird um *2 erweitert, weil wir durch, dass hex-Format mit halben Bytes arbeiten.
-            self.offset = int(self.to_big_endian(get_seg(self.exif_seg, endian_part.end()+4, 8)), 16) * 2
+            #offest wird um factor 2 vergrößert, weil wir durch, dass hex-Format mit halben
+            #Bytes arbeiten.
+            self.offset = int(self.to_big_endian(
+                get_seg(self.exif_seg, endian_part.end()+4, 8)), 16) * 2
 
-            self.num_of_tags = int(self.to_big_endian(get_seg(self.exif_seg, endian_part.end()+12, 4)), 16)
-            self.tags_seg = get_seg(self.exif_seg, endian_part.end()+16, self.num_of_tags*24)
+            self.num_of_tags = int(self.to_big_endian(
+                get_seg(self.exif_seg, endian_part.end()+12, 4)), 16)
+            self.tags_seg = get_seg(self.exif_seg,
+                endian_part.end()+16, self.num_of_tags*24)
             self.tags = self.get_tags(self.num_of_tags, self.tags_seg)
 
             if "8769" in self.tags:
-                self.ptr_offset = int(self.tags["8769"][2], 16) * 2 + self.offset # exception when no pointer einbauen
-                self.num_of_ptr_tags = int(self.to_big_endian(get_seg(self.exif_seg, self.ptr_offset, 4)), 16)
-                self.ptr_tags_seg = get_seg(self.exif_seg, self.ptr_offset+4, self.num_of_ptr_tags*24+4) 
+                self.ptr_offset = int(self.tags["8769"][2], 16) * 2 + self.offset
+                self.num_of_ptr_tags = int(self.to_big_endian(
+                    get_seg(self.exif_seg, self.ptr_offset, 4)), 16)
+                self.ptr_tags_seg = get_seg(self.exif_seg, 
+                    self.ptr_offset+4, self.num_of_ptr_tags*24+4) 
                 self.ptr_tags = self.get_tags(self.num_of_ptr_tags, self.ptr_tags_seg)
 
     def to_big_endian(self, hex_part):
@@ -79,8 +91,11 @@ class ExifEditor():
             tag = seg[24*i:(1+i)*24]
             tag_id = self.to_big_endian(tag[:4])
             tag_type = self.to_big_endian(tag[4:8])
-            tag_size = self.to_big_endian(tag[8:16]) # Funktioniert nicht für Tag-Content, welcher ohne offset gespeichert ist.
-            tag_offset = self.to_big_endian(tag[16:]) # offset vom tag-Content + offset vom exif-header.
+            
+            # !!!Funktioniert nicht für Tag-Content, welcher ausschließlich in den 4 Bytes zum
+            # berechnen vom Offset gespeichert sind.
+            tag_size = self.to_big_endian(tag[8:16]) 
+            tag_offset = self.to_big_endian(tag[16:])
             tags[tag_id] = (tag_type, tag_size, tag_offset)
         return tags
     
@@ -107,7 +122,7 @@ class ExifEditor():
         (tag_type, tag_size, tag_offset) = tag
         temp_offset = int(tag_offset, 16)*2 + self.offset
         tag_value = self.exif_seg[temp_offset:
-                            temp_offset +int(tag_size, 16)*self.get_tag_type_size(int(tag_type, 16))] # Achtung wegen ifdpointer!!!!!!! und little endian
+            temp_offset +int(tag_size, 16)*self.get_tag_type_size(int(tag_type, 16))]
         
         return tag_value
 
@@ -121,7 +136,7 @@ class ExifEditor():
         
         return temp_tag
             
-    def get_date(self): # beispiel zur untermalung des verständnisses kann nur vom aktuell benutzten file das datum holen nicht vom restorten file
+    def get_date(self): # beispiel zur Untermalung des Verständnisses
 
         temp_tag = self.take_tag("9003")  # 0x9003 steht für dateOriginalTime
 
@@ -132,7 +147,8 @@ class ExifEditor():
         ascii_date = [int(bin_date[i:i+2], 16) for i in range(0, len(bin_date), 2)]
         return ''.join(chr(i) for i in ascii_date)
 
-    def set_date_and_restore(self, new_date): # works only for files with dateOriginalTime-tag to set a date without existing tag we described a way in or paper
+    def set_date_and_restore(self, new_date): #Funktioniert nur für Files mit bereits vorhandenem 
+                                              #dateOriginalTime-Tag
 
         temp_tag = self.take_tag("9003")
         if temp_tag is None:
@@ -140,11 +156,17 @@ class ExifEditor():
         new_date_converted = ''.join(str(hex(ord(c))[2:]).upper() for c in new_date) + '00'
         (tag_type, tag_size, tag_offset) = temp_tag
         temp_offset = int(tag_offset, 16)*2 + self.offset
-        to_restore = self.file_dump[:self.start+temp_offset] + new_date_converted + self.file_dump[self.start+temp_offset+int(tag_size, 16)*self.get_tag_type_size(int(tag_type, 16)):]
-        self.restore(to_restore)
-        #Beispiel Funktionen für die Manipulation vom Datum, mit mehr Zeit könnte man auch eine...
+        self.file_dump = self.file_dump[:self.start+temp_offset] \
+            + new_date_converted \
+            + self.file_dump[
+                self.start+temp_offset+int(tag_size, 16)*self.get_tag_type_size(int(tag_type, 16)):]
+        self.exif_seg = self.exif_seg[:temp_offset] \
+            + new_date_converted \
+            + self.exif_seg[
+                temp_offset+int(tag_size, 16)*self.get_tag_type_size(int(tag_type, 16)):]
+        self.restore()
 
-    def restore(self, to_restore):
+    def restore(self):
         with open(self.restore_file_path, "wb") as file:
-            temp_dumper = dehex(to_restore)
+            temp_dumper = dehex(self.file_dump)
             file.write(temp_dumper)

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-FILE_NAME = "bird1"
+FILE_NAME = "canon"
 
 MAIN_FOLDER_PATH = Path("JPEG-Format-Project/code/file_path").parents[2].absolute()
 
