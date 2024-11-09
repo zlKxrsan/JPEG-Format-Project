@@ -1,10 +1,9 @@
 import re
-from file_path import FILE_PATH, RESTORE_FILE_PATH
 from hexdump import dump, dehex
 from enum import Flag
 
-"""This Module contains all functions handling the exif-segment of or jpeg-files"""
-"""We work with 4 bits instead of 8 due to the handling of the dataflow in hex with hexdump, so every offset is 2x"""
+"""Dieses Modul beinhaltet diverse Schritte zum analysieren und bearbeiten des EXIF-segments im Dataflow eines JPEG/JPG-Files"""
+""""""
 
 #schau auf ptr case nur wenn vorhanden
 
@@ -32,10 +31,10 @@ class ExifEditor():
 
     # Diese Variablen sind für alle IFD-Tags, welche von einem IFDPointer addressiert werden.
 
-    prt_offset = 0
-    num_of_ptr_tags = 0
-    ptr_tags_seg = ""
-    ptr_tags = {}
+    prt_offset = None
+    num_of_ptr_tags = None
+    ptr_tags_seg = None
+    ptr_tags = None
 
     def __init__(self, file_path, restore_file_path):
 
@@ -61,16 +60,11 @@ class ExifEditor():
             self.tags_seg = get_seg(self.exif_seg, endian_part.end()+16, self.num_of_tags*24)
             self.tags = self.get_tags(self.num_of_tags, self.tags_seg)
 
-            self.ptr_offset = int(self.tags["8769"][2], 16) * 2 + self.offset # exception when no pointer einbauen
-            self.num_of_ptr_tags = int(self.to_big_endian(get_seg(self.exif_seg, self.ptr_offset, 4)), 16)
-            self.ptr_tags_seg = get_seg(self.exif_seg, self.ptr_offset+4, self.num_of_ptr_tags*24+4) #?????=============================================!!!!!!
-            self.ptr_tags = self.get_tags(self.num_of_ptr_tags, self.ptr_tags_seg)
-
-            #to_restore = set_date(file_dump, "2010:10:10 10:10:10", start, ptr_tags) # achtung tags welche
-
-            #with open(RESTORE_FILE_PATH, "wb") as file:
-            #    file_dumper = dehex(to_restore)
-            #    file.write(file_dumper)
+            if "8769" in self.tags:
+                self.ptr_offset = int(self.tags["8769"][2], 16) * 2 + self.offset # exception when no pointer einbauen
+                self.num_of_ptr_tags = int(self.to_big_endian(get_seg(self.exif_seg, self.ptr_offset, 4)), 16)
+                self.ptr_tags_seg = get_seg(self.exif_seg, self.ptr_offset+4, self.num_of_ptr_tags*24+4) 
+                self.ptr_tags = self.get_tags(self.num_of_ptr_tags, self.ptr_tags_seg)
 
     def to_big_endian(self, hex_part):
         if self.endian == Endian.BIG:
@@ -117,14 +111,34 @@ class ExifEditor():
         
         return tag_value
 
-    def get_date(self, tags): # beispiel zur untermalung des verständnisses
-        bin_date = self.get_tag_value(tags["9003"])
+    def take_tag(self, tag):
+        temp_tag = None
+
+        if tag in self.tags:
+            temp_tag = self.tags[tag]
+        elif self.ptr_tags is not None and tag in self.ptr_tags:
+            temp_tag = self.ptr_tags[tag]
+        
+        return temp_tag
+            
+    def get_date(self): # beispiel zur untermalung des verständnisses kann nur vom aktuell benutzten file das datum holen nicht vom restorten file
+
+        temp_tag = self.take_tag("9003")  # 0x9003 steht für dateOriginalTime
+
+        if temp_tag is None:
+            return "No dateOriginalTime-Tag in current file." 
+
+        bin_date = self.get_tag_value(temp_tag)
         ascii_date = [int(bin_date[i:i+2], 16) for i in range(0, len(bin_date), 2)]
         return ''.join(chr(i) for i in ascii_date)
 
-    def set_date_and_restore(self, new_date, tags):
+    def set_date_and_restore(self, new_date): # works only for files with dateOriginalTime-tag to set a date without existing tag we described a way in or paper
+
+        temp_tag = self.take_tag("9003")
+        if temp_tag is None:
+            return "No date to be change."
         new_date_converted = ''.join(str(hex(ord(c))[2:]).upper() for c in new_date) + '00'
-        (tag_type, tag_size, tag_offset) = tags['9003']
+        (tag_type, tag_size, tag_offset) = temp_tag
         temp_offset = int(tag_offset, 16)*2 + self.offset
         to_restore = self.file_dump[:self.start+temp_offset] + new_date_converted + self.file_dump[self.start+temp_offset+int(tag_size, 16)*self.get_tag_type_size(int(tag_type, 16)):]
         self.restore(to_restore)
