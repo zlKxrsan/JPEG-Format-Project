@@ -3,7 +3,7 @@ from hexdump import dump, dehex
 import re
 
 """This modul isn't meant to handle dqt 02 and 03 and 16-bit presizion tabelles"""
-
+#TODO refactoring und mehr tests
 class DqtEditor():
 
     file_dump = None
@@ -74,12 +74,12 @@ class DqtEditor():
         
         if num == 0:
             self.table_1 = table
-            self.file_dump = self.file_dump[:self.start_1+6] + ''.join(table).replace(" ", "") + self.file_dump[self.end_1:] #achtung whitespace bei join?
+            self.file_dump = self.file_dump[:self.start_1+6] + ''.join(table) + self.file_dump[self.end_1:] #achtung whitespace bei join?
             self.restore()
 
         elif num == 1:
             self.table_2 = table
-            self.file_dump = self.file_dump[:self.start_2+6] + ''.join(table).replace(" ", "") + self.file_dump[self.end_2:]
+            self.file_dump = self.file_dump[:self.start_2+6] + ''.join(table) + self.file_dump[self.end_2:]
             self.restore()
             
     def restore(self):
@@ -87,17 +87,3 @@ class DqtEditor():
         with open(self.restore_path, "wb") as file:
             temp_dumper = dehex(self.file_dump)
             file.write(temp_dumper)
-
-temp = DqtEditor(FILE_PATH, RESTORE_FILE_PATH)
-#table = temp.get_table(0)
-test_table = ['0F 0F 0F 0F 0F 0F 0F 0F',
-              '02 02 02 02 02 02 03 05', 
-              '03 03 03 03 03 06 04 04',
-              '03 05 07 06 07 07 07 06', 
-              '07 07 08 09 0B 09 08 08',
-              '0A 08 07 07 0A 0D 0A 0A', 
-              '0B 0C 0C 0C 0C 07 09 0E',
-              '0F 0D 0C 0E 0B 0C 0C 0C']
-temp.set_and_restore_table(1, test_table)
-
-# set and restore is wrong
