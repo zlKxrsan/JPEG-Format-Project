@@ -1,9 +1,8 @@
-from file_path import FILE_PATH, RESTORE_FILE_PATH
+from file_path import get_path, get_restore_path
 from hexdump import dump, dehex
 import re
 
 """This modul isn't meant to handle dqt 02 and 03 and 16-bit presizion tabelles"""
-#TODO refactoring und mehr tests
 class DqtEditor():
 
     file_dump = None
@@ -17,11 +16,11 @@ class DqtEditor():
     table_2 = None
     restore_path = None
 
-    def __init__(self, file_path, restore_path):
+    def __init__(self, input):
 
-        self.restore_path = restore_path
+        self.restore_path = get_restore_path(input, "dqt")
 
-        with open(file_path, "rb") as file:
+        with open(get_path(input), "rb") as file:
 
             file_content = file.read()
             self.file_dump = dump(file_content, size=1, sep='')
@@ -74,7 +73,7 @@ class DqtEditor():
         
         if num == 0:
             self.table_1 = table
-            self.file_dump = self.file_dump[:self.start_1+6] + ''.join(table) + self.file_dump[self.end_1:] #achtung whitespace bei join?
+            self.file_dump = self.file_dump[:self.start_1+6] + ''.join(table) + self.file_dump[self.end_1:]
             self.restore()
 
         elif num == 1:

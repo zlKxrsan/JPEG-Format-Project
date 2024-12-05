@@ -1,6 +1,7 @@
 import re
 from hexdump import dump, dehex
 from enum import Flag
+from file_path import get_path, get_restore_path
 
 """Dieses Modul beinhaltet diverse Schritte zum analysieren und bearbeiten des EXIF-segments
 im Dataflow eines JPEG/JPG-File. Die Implementierung berücksichtigt auch die speicheraddresse von
@@ -39,10 +40,10 @@ class ExifEditor():
     ptr_tags_seg = None
     ptr_tags = None
 
-    def __init__(self, file_path, restore_file_path):
+    def __init__(self, input):
 
-        self.restore_file_path = restore_file_path
-        with open(file_path, "rb") as file:
+        self.restore_file_path = get_restore_path(input, "exif")
+        with open(get_path(input), "rb") as file:
 
             file_content = file.read()
             self.file_dump = dump(file_content, size=1, sep='')

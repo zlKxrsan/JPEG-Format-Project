@@ -1,9 +1,11 @@
 from pathlib import Path
 
-FILE_NAME = "bird1"
-
 MAIN_FOLDER_PATH = Path("JPEG-Format-Project/code/file_path").parents[2].absolute()
 
-FILE_PATH = MAIN_FOLDER_PATH / ("jpegs/" + FILE_NAME + ".jpg")
+def get_path(file_name):
 
-RESTORE_FILE_PATH = MAIN_FOLDER_PATH / ("restored_jpegs/" + FILE_NAME + "_restored.jpg")
+    return MAIN_FOLDER_PATH / ("jpegs/" + file_name + ".jpeg")
+
+
+def get_restore_path(file_name, extra_name):
+    return MAIN_FOLDER_PATH / ("restored_jpegs/" + file_name + "_" + extra_name + ".jpeg")
