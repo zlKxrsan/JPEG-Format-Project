@@ -2,10 +2,10 @@ from exif_tools import ExifEditor
 from dqt_tools import DqtEditor
 from monochrom_tools import make_all_types 
 
-input = "bird1"
+input = "frog1"
 
 exif_obj = ExifEditor(input)
-exif_obj.set_date_and_restore("2010:10:10 10:10:10") # achtung tags welche
+exif_obj.set_date_and_restore("2010:10:10 10:10:10") #Beispiel Datum
 
 dqt_obj = DqtEditor(input)
 dqt_table = ['0F 0F 0F 0F 0F 0F 0F 0F',
