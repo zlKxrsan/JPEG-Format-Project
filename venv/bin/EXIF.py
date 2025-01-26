@@ -1,4 +1,4 @@
-#!/home/lawan/Documents/JPEG-Format-Project/.venv/bin/python3
+#!/home/lawan/Documents/JPEG-Format-Project/venv/bin/python3
 #
 #
 # Library to extract Exif information from digital camera image files.
