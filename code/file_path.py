@@ -4,8 +4,8 @@ MAIN_FOLDER_PATH = Path("JPEG-Format-Project/code/file_path").parents[2].absolut
 
 def get_path(file_name):
 
-    return MAIN_FOLDER_PATH / ("jpegs/" + file_name + ".jpeg")
+    return MAIN_FOLDER_PATH / ("jpegs/" + file_name)
 
 
 def get_restore_path(file_name, extra_name):
-    return MAIN_FOLDER_PATH / ("restored_jpegs/" + file_name + "_" + extra_name + ".jpeg")
+    return MAIN_FOLDER_PATH / ("restored_jpegs/" + file_name + "_" + extra_name)
